@@ -39,6 +39,24 @@ func SaveBook(book Book) error {
 	return nil
 }
 
+func UpdateBook(book Book) (*Book, error) {
+	//Perform InsertOne operation & validate against the error.
+	filter := bson.D{primitive.E{Key: "isbn", Value: book.Isbn}}
+	upsert := true
+	after := options.After
+	opt := options.FindOneAndReplaceOptions{
+		ReturnDocument: &after,
+		Upsert:         &upsert,
+	}
+	result := collection.FindOneAndReplace(context.TODO(), filter, book, &opt)
+	if result.Err() != nil {
+		return nil, result.Err()
+	}
+	var t *Book
+	fmt.Println(result.Decode(&t))
+	return t, nil
+}
+
 func GetAll() ([]*Book, error) {
 	var tasks []*Book
 	filter := bson.D{primitive.E{Key: "", Value: nil}}
@@ -66,8 +84,8 @@ func GetAll() ([]*Book, error) {
 	return tasks, nil
 }
 
-func GetBook(isbn string) (Book, error) {
-	result := Book{}
+func GetBook(isbn string) (*Book, error) {
+	var result *Book
 	filter := bson.D{primitive.E{Key: "isbn", Value: isbn}}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
