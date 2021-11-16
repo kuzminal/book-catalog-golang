@@ -39,6 +39,20 @@ func SaveBook(book Book) error {
 	return nil
 }
 
+func DeleteBook(isbn string) error {
+	filter := bson.D{primitive.E{Key: "isbn", Value: isbn}}
+	duration := time.Second
+	opt := options.FindOneAndDeleteOptions{
+		MaxTime: &duration,
+	}
+	result := collection.FindOneAndDelete(context.TODO(), filter, &opt)
+	if result.Err() != nil {
+		return result.Err()
+	}
+	//Return success without any error.
+	return nil
+}
+
 func UpdateBook(book Book) (*Book, error) {
 	//Perform InsertOne operation & validate against the error.
 	filter := bson.D{primitive.E{Key: "isbn", Value: book.Isbn}}
