@@ -8,14 +8,21 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
+	"os"
 	"time"
 )
 
 var collection *mongo.Collection
 var ctx = context.TODO()
+var mongoDbUri = os.Getenv("MONGODB_URI")
+var mongoDbDatabase = os.Getenv("MONGODB_DATABASE")
+var mongoDbCollection = os.Getenv("MONGODB_COLLECTION")
 
 func init() {
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017/")
+	if mongoDbUri == "" {
+		mongoDbUri = "mongodb://localhost:27017/"
+	}
+	clientOptions := options.Client().ApplyURI(mongoDbUri)
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		log.Fatal(err)
@@ -24,6 +31,12 @@ func init() {
 	err = client.Ping(ctx, nil)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if mongoDbDatabase == "" {
+		mongoDbDatabase = "book-catalog"
+	}
+	if mongoDbCollection == "" {
+		mongoDbCollection = "books"
 	}
 
 	collection = client.Database("book-catalog").Collection("books")
