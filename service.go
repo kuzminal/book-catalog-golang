@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
+	"time"
 )
 
 const (
@@ -12,32 +14,32 @@ const (
 	AppPort    = ":8081"
 )
 
-func asyncWrite() {
-	book, ok := <-CreateBookChannel
-	if ok {
-		err := SaveBook(book)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-	}
-}
-
-func asyncUpdate() {
-	book, ok := <-UpdateBookChannel
-	if ok {
-		_, err := UpdateBook(book)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-	}
-}
-
-func asyncDelete() {
-	isbn, ok := <-DeleteBookChannel
-	if ok {
-		err := DeleteBook(isbn)
-		if err != nil {
-			log.Fatal(err.Error())
+func asyncHandleChannels() {
+	for {
+		select {
+		case book, ok := <-CreateBookChannel:
+			if ok {
+				err := SaveBook(book)
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+			}
+		case book, ok := <-UpdateBookChannel:
+			if ok {
+				_, err := UpdateBook(book)
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+			}
+		case isbn, ok := <-DeleteBookChannel:
+			if ok {
+				err := DeleteBook(isbn)
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+			}
+		case <-time.After(4 * time.Second):
+			fmt.Println("\ntime.After()!")
 		}
 	}
 }
@@ -45,9 +47,7 @@ func asyncDelete() {
 func main() {
 	r := mux.NewRouter()
 
-	go asyncWrite()
-	go asyncUpdate()
-	go asyncDelete()
+	go asyncHandleChannels()
 
 	r.HandleFunc(ApiVersion+ApiPrefix, getAllHandler).Methods("GET")
 	r.HandleFunc(ApiVersion+ApiPrefix, postHandler).Methods("POST")
