@@ -49,7 +49,7 @@ func SaveBook(book *Book) error {
 		return err
 	}
 	//Return success without any error.
-	AddBookToCache(book)
+	go AddBookToCache(book)
 	return nil
 }
 
@@ -64,7 +64,7 @@ func DeleteBook(isbn string) error {
 		return result.Err()
 	}
 	//Return success without any error.
-	DeleteBookFromCache(isbn)
+	go DeleteBookFromCache(isbn)
 	return nil
 }
 
@@ -81,36 +81,37 @@ func UpdateBook(book Book) (*Book, error) {
 	if result.Err() != nil {
 		return nil, result.Err()
 	}
-	var t *Book
-	fmt.Println(result.Decode(&t))
-	return t, nil
+	var bookDecoded *Book
+	fmt.Println(result.Decode(&bookDecoded))
+	go AddBookToCache(bookDecoded)
+	return bookDecoded, nil
 }
 
 func GetAll() ([]*Book, error) {
-	var tasks []*Book
+	var books []*Book
 	filter := bson.D{primitive.E{Key: "", Value: nil}}
 	cur, err := collection.Find(ctx, filter)
 	if err != nil {
-		return tasks, err
+		return books, err
 	}
 	// Iterate through the cursor and decode each document one at a time
 	for cur.Next(ctx) {
-		var t Book
-		err := cur.Decode(&t)
+		var book Book
+		err := cur.Decode(&book)
 		if err != nil {
-			return tasks, err
+			return books, err
 		}
-		tasks = append(tasks, &t)
+		books = append(books, &book)
 	}
 	if err := cur.Err(); err != nil {
-		return tasks, err
+		return books, err
 	}
 	// once exhausted, close the cursor
 	cur.Close(ctx)
-	if len(tasks) == 0 {
-		return tasks, mongo.ErrNoDocuments
+	if len(books) == 0 {
+		return books, mongo.ErrNoDocuments
 	}
-	return tasks, nil
+	return books, nil
 }
 
 func GetBook(isbn string) (*Book, error) {
@@ -128,7 +129,7 @@ func GetBook(isbn string) (*Book, error) {
 			log.Fatal(err)
 			return result, err
 		}
-		AddBookToCache(result)
+		go AddBookToCache(result)
 		return result, nil
 	} else {
 		return book, nil
