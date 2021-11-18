@@ -42,13 +42,14 @@ func init() {
 	collection = client.Database("book-catalog").Collection("books")
 }
 
-func SaveBook(book Book) error {
+func SaveBook(book *Book) error {
 	//Perform InsertOne operation & validate against the error.
 	_, err := collection.InsertOne(context.TODO(), book)
 	if err != nil {
 		return err
 	}
 	//Return success without any error.
+	AddBookToCache(book)
 	return nil
 }
 
@@ -63,6 +64,7 @@ func DeleteBook(isbn string) error {
 		return result.Err()
 	}
 	//Return success without any error.
+	DeleteBookFromCache(isbn)
 	return nil
 }
 
@@ -112,17 +114,23 @@ func GetAll() ([]*Book, error) {
 }
 
 func GetBook(isbn string) (*Book, error) {
-	var result *Book
-	filter := bson.D{primitive.E{Key: "isbn", Value: isbn}}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err := collection.FindOne(ctx, filter).Decode(&result)
-	if err == mongo.ErrNoDocuments {
-		// Do something when no record was found
-		fmt.Println("record does not exist")
-	} else if err != nil {
-		log.Fatal(err)
-		return result, err
+	book, errCache := GetBookFromCache(isbn)
+	if errCache != nil {
+		var result *Book
+		filter := bson.D{primitive.E{Key: "isbn", Value: isbn}}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := collection.FindOne(ctx, filter).Decode(&result)
+		if err == mongo.ErrNoDocuments {
+			// Do something when no record was found
+			fmt.Println("record does not exist")
+		} else if err != nil {
+			log.Fatal(err)
+			return result, err
+		}
+		AddBookToCache(result)
+		return result, nil
+	} else {
+		return book, nil
 	}
-	return result, nil
 }

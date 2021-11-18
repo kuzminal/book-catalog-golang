@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
@@ -19,7 +18,7 @@ func asyncHandleChannels() {
 		select {
 		case book, ok := <-CreateBookChannel:
 			if ok {
-				err := SaveBook(book)
+				err := SaveBook(&book)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -39,7 +38,6 @@ func asyncHandleChannels() {
 				}
 			}
 		case <-time.After(4 * time.Second):
-			fmt.Println("\ntime.After()!")
 		}
 	}
 }
