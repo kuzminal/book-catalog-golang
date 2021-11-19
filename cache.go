@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"github.com/go-redis/cache/v8"
 	"github.com/go-redis/redis/v8"
 	"log"
+	"os"
 	"time"
 )
 
@@ -11,14 +13,28 @@ var cacheBooks *cache.Cache
 var keyCache = "books"
 
 func init() {
-	ring := redis.NewRing(&redis.RingOptions{
+	//для кластера
+	/*ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
 			"localhost": ":6379",
 		},
+	})*/
+	var redisHost = os.Getenv("REDIS_HOST")
+	var redisPort = os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "localhost"
+	}
+	if redisPort == "" {
+		redisPort = "6379"
+	}
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", redisHost, redisPort),
+		Password: "", // no password set
+		DB:       0,  // use default DB
 	})
 
 	cacheBooks = cache.New(&cache.Options{
-		Redis:      ring,
+		Redis:      redisClient,
 		LocalCache: cache.NewTinyLFU(1000, time.Minute),
 	})
 }
