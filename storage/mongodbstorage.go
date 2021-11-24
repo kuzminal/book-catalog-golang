@@ -1,6 +1,8 @@
-package main
+package storage
 
 import (
+	"book-catalog/cache"
+	"book-catalog/core"
 	"context"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
@@ -42,14 +44,14 @@ func init() {
 	collection = client.Database("book-catalog").Collection("books")
 }
 
-func SaveBook(book *Book) error {
+func SaveBook(book *core.Book) error {
 	//Perform InsertOne operation & validate against the error.
 	_, err := collection.InsertOne(context.TODO(), book)
 	if err != nil {
 		return err
 	}
 	//Return success without any error.
-	go AddBookToCache(book)
+	go cache.AddBookToCache(book)
 	return nil
 }
 
@@ -64,11 +66,11 @@ func DeleteBook(isbn string) error {
 		return result.Err()
 	}
 	//Return success without any error.
-	go DeleteBookFromCache(isbn)
+	go cache.DeleteBookFromCache(isbn)
 	return nil
 }
 
-func UpdateBook(book Book) (*Book, error) {
+func UpdateBook(book core.Book) (*core.Book, error) {
 	//Perform InsertOne operation & validate against the error.
 	filter := bson.D{primitive.E{Key: "isbn", Value: book.Isbn}}
 	upsert := true
@@ -81,14 +83,14 @@ func UpdateBook(book Book) (*Book, error) {
 	if result.Err() != nil {
 		return nil, result.Err()
 	}
-	var bookDecoded *Book
+	var bookDecoded *core.Book
 	fmt.Println(result.Decode(&bookDecoded))
-	go AddBookToCache(bookDecoded)
+	go cache.AddBookToCache(bookDecoded)
 	return bookDecoded, nil
 }
 
-func GetAll() ([]*Book, error) {
-	var books []*Book
+func GetAll() ([]*core.Book, error) {
+	var books []*core.Book
 	filter := bson.D{primitive.E{Key: "", Value: nil}}
 	cur, err := collection.Find(ctx, filter)
 	if err != nil {
@@ -96,7 +98,7 @@ func GetAll() ([]*Book, error) {
 	}
 	// Iterate through the cursor and decode each document one at a time
 	for cur.Next(ctx) {
-		var book Book
+		var book core.Book
 		err := cur.Decode(&book)
 		if err != nil {
 			return books, err
@@ -114,10 +116,10 @@ func GetAll() ([]*Book, error) {
 	return books, nil
 }
 
-func GetBook(isbn string) (*Book, error) {
-	book, errCache := GetBookFromCache(isbn)
+func GetBook(isbn string) (*core.Book, error) {
+	book, errCache := cache.GetBookFromCache(isbn)
 	if errCache != nil {
-		var result *Book
+		var result *core.Book
 		filter := bson.D{primitive.E{Key: "isbn", Value: isbn}}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -129,7 +131,7 @@ func GetBook(isbn string) (*Book, error) {
 			log.Fatal(err)
 			return result, err
 		}
-		go AddBookToCache(result)
+		go cache.AddBookToCache(result)
 		return result, nil
 	} else {
 		return book, nil

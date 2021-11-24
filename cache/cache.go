@@ -1,6 +1,8 @@
-package main
+package cache
 
 import (
+	"book-catalog/core"
+	"context"
 	"fmt"
 	"github.com/go-redis/cache/v8"
 	"github.com/go-redis/redis/v8"
@@ -11,6 +13,7 @@ import (
 
 var cacheBooks *cache.Cache
 var keyCache = "books"
+var ctx = context.TODO()
 
 func init() {
 	//для кластера
@@ -39,7 +42,7 @@ func init() {
 	})
 }
 
-func AddBookToCache(book *Book) {
+func AddBookToCache(book *core.Book) {
 	if err := cacheBooks.Set(&cache.Item{
 		Ctx:   ctx,
 		Key:   keyCache + ":" + book.Isbn,
@@ -51,8 +54,8 @@ func AddBookToCache(book *Book) {
 	log.Printf("Cached book : %v", book)
 }
 
-func GetBookFromCache(isbn string) (*Book, error) {
-	var book *Book
+func GetBookFromCache(isbn string) (*core.Book, error) {
+	var book *core.Book
 	if err := cacheBooks.Get(ctx, keyCache+":"+isbn, &book); err != nil {
 		log.Printf("Cannot find book with isbn : %s", isbn)
 		return nil, err

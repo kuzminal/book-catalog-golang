@@ -1,38 +1,32 @@
 package main
 
 import (
-	"github.com/gorilla/mux"
+	"book-catalog/frontend"
+	"book-catalog/storage"
 	"log"
-	"net/http"
 	"time"
-)
-
-const (
-	ApiPrefix  = "/books"
-	ApiVersion = "/v1"
-	AppPort    = ":8081"
 )
 
 func asyncHandleChannels() {
 	for {
 		select {
-		case book, ok := <-CreateBookChannel:
+		case book, ok := <-frontend.CreateBookChannel:
 			if ok {
-				err := SaveBook(&book)
+				err := storage.SaveBook(&book)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
 			}
-		case book, ok := <-UpdateBookChannel:
+		case book, ok := <-frontend.UpdateBookChannel:
 			if ok {
-				_, err := UpdateBook(book)
+				_, err := storage.UpdateBook(book)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
 			}
-		case isbn, ok := <-DeleteBookChannel:
+		case isbn, ok := <-frontend.DeleteBookChannel:
 			if ok {
-				err := DeleteBook(isbn)
+				err := storage.DeleteBook(isbn)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
@@ -43,15 +37,9 @@ func asyncHandleChannels() {
 }
 
 func main() {
-	r := mux.NewRouter()
 
 	go asyncHandleChannels()
+	fe := frontend.RestFrontEnd{}
+	fe.Start()
 
-	r.HandleFunc(ApiVersion+ApiPrefix, getAllHandler).Methods("GET")
-	r.HandleFunc(ApiVersion+ApiPrefix, postHandler).Methods("POST")
-	r.HandleFunc(ApiVersion+ApiPrefix+"/{key}", getHandler).Methods("GET")
-	r.HandleFunc(ApiVersion+ApiPrefix+"/{key}", putHandler).Methods("PUT")
-	r.HandleFunc(ApiVersion+ApiPrefix+"/{key}", deleteHandler).Methods("DELETE")
-
-	log.Fatal(http.ListenAndServe(AppPort, r))
 }

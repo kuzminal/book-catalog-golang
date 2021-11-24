@@ -1,4 +1,4 @@
-package main
+package core
 
 type Book struct {
 	//Id             string  `bson:"_id,omitempty"`
