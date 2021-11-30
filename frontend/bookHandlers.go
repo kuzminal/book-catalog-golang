@@ -4,7 +4,7 @@ import (
 	"book-catalog/core"
 	"book-catalog/storage"
 	"encoding/json"
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 	"log"
 	"mime"
 	"net/http"
@@ -31,16 +31,16 @@ func notAllowedHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Not Allowed", http.StatusMethodNotAllowed)
 }
 
-func (f *RestFrontEnd) loggingMiddleware(next http.Handler) http.Handler {
+/*func (f *RestFrontEnd) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println(r.Method, r.RequestURI)
 		next.ServeHTTP(w, r)
 	})
-}
+}*/
 
-func GetHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r) // Извлечь ключ из запроса
-	key := vars["key"]
+func GetHandler(c *gin.Context) {
+	key := c.Params.ByName("id")
+	log.Println("Key : " + key)
 	book, err := storage.GetBook(key)
 
 	if err != nil {
@@ -48,83 +48,76 @@ func GetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if book != nil {
-		renderJSON(w, book)
+		renderJSON(c.Writer, book)
 	} else {
-		w.WriteHeader(http.StatusNotFound)
+		c.Writer.WriteHeader(http.StatusNotFound)
 	}
 }
 
-func GetAllHandler(w http.ResponseWriter, r *http.Request) {
+func GetAllHandler(c *gin.Context) {
 	book, err := storage.GetAll()
 	if err != nil {
 		log.Fatal("Cannot get books from database")
 	}
 	if book != nil {
-		renderJSON(w, book)
+		renderJSON(c.Writer, book)
 	} else {
-		w.WriteHeader(http.StatusNotFound)
+		c.Writer.WriteHeader(http.StatusNotFound)
 	}
 }
 
-func DeleteHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r) // Извлечь ключ из запроса
-	key := vars["key"]
+func DeleteHandler(c *gin.Context) {
+	key := c.Params.ByName("id")
 	DeleteBookChannel <- key
-	w.WriteHeader(http.StatusAccepted)
+	c.Writer.WriteHeader(http.StatusAccepted)
 }
 
-func PostHandler(w http.ResponseWriter, r *http.Request) {
+func PostHandler(c *gin.Context) {
 	// Enforce a JSON Content-Type.
-	contentType := r.Header.Get("Content-Type")
+	contentType := c.Request.Header.Get("Content-Type")
 	mediatype, _, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if mediatype != "application/json" {
-		http.Error(w, "expect application/json Content-Type", http.StatusUnsupportedMediaType)
+		http.Error(c.Writer, "expect application/json Content-Type", http.StatusUnsupportedMediaType)
 		return
 	}
 
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(c.Request.Body)
 	dec.DisallowUnknownFields()
 	var book core.Book
 	if err := dec.Decode(&book); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 	CreateBookChannel <- book
-	w.WriteHeader(http.StatusAccepted)
+	c.Writer.WriteHeader(http.StatusAccepted)
 }
 
-func PutHandler(w http.ResponseWriter, r *http.Request) {
+func PutHandler(c *gin.Context) {
 	// Enforce a JSON Content-Type.
-	contentType := r.Header.Get("Content-Type")
+	contentType := c.Request.Header.Get("Content-Type")
 	mediatype, _, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if mediatype != "application/json" {
-		http.Error(w, "expect application/json Content-Type", http.StatusUnsupportedMediaType)
+		http.Error(c.Writer, "expect application/json Content-Type", http.StatusUnsupportedMediaType)
 		return
 	}
 
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(c.Request.Body)
 	dec.DisallowUnknownFields()
 	var book core.Book
 	if err := dec.Decode(&book); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(c.Writer, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	/*result, err := UpdateBook(book)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-	renderJSON(w, result)*/
 	UpdateBookChannel <- book
-	w.WriteHeader(http.StatusAccepted)
+	c.Writer.WriteHeader(http.StatusAccepted)
 }
 
 // renderJSON renders 'v' as JSON and writes it as a response into w.
@@ -139,17 +132,13 @@ func renderJSON(w http.ResponseWriter, v interface{}) {
 }
 
 func (f *RestFrontEnd) Start() error {
-	// Запомнить ссылку на основное приложение.
+	r := gin.Default()
 
-	r := mux.NewRouter()
+	r.GET(ApiVersion+ApiPrefix, GetAllHandler)
+	r.POST(ApiVersion+ApiPrefix, PostHandler)
+	r.GET(ApiVersion+ApiPrefix+"/:id", GetHandler)
+	r.PUT(ApiVersion+ApiPrefix+"/:id", PutHandler)
+	r.DELETE(ApiVersion+ApiPrefix+"/:id", DeleteHandler)
 
-	r.Use(f.loggingMiddleware)
-
-	r.HandleFunc(ApiVersion+ApiPrefix, GetAllHandler).Methods("GET")
-	r.HandleFunc(ApiVersion+ApiPrefix, PostHandler).Methods("POST")
-	r.HandleFunc(ApiVersion+ApiPrefix+"/{key}", GetHandler).Methods("GET")
-	r.HandleFunc(ApiVersion+ApiPrefix+"/{key}", PutHandler).Methods("PUT")
-	r.HandleFunc(ApiVersion+ApiPrefix+"/{key}", DeleteHandler).Methods("DELETE")
-
-	return http.ListenAndServe(AppPort, r)
+	return r.Run(AppPort)
 }

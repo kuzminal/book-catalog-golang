@@ -23,7 +23,7 @@ func init() {
 		},
 	})*/
 	var redisHost = os.Getenv("REDIS_HOST")
-	var redisPort = os.Getenv("REDIS_HOST")
+	var redisPort = os.Getenv("REDIS_PORT")
 	if redisHost == "" {
 		redisHost = "localhost"
 	}
@@ -43,6 +43,7 @@ func init() {
 }
 
 func AddBookToCache(book *core.Book) {
+	log.Printf("Add book to cache : %v", book)
 	if err := cacheBooks.Set(&cache.Item{
 		Ctx:   ctx,
 		Key:   keyCache + ":" + book.Isbn,

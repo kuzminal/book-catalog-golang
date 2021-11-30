@@ -24,8 +24,15 @@ func init() {
 	if mongoDbUri == "" {
 		mongoDbUri = "mongodb://localhost:27017/"
 	}
-	clientOptions := options.Client().ApplyURI(mongoDbUri)
-	client, err := mongo.Connect(ctx, clientOptions)
+	opt := options.ClientOptions{}
+	opt.ApplyURI(mongoDbUri)
+	timeOut := 30 * time.Second
+	opt.ConnectTimeout = &timeOut
+	opt.ServerSelectionTimeout = &timeOut
+	//clientOptions := options.Client().ApplyURI(mongoDbUri)
+	cont, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(cont, &opt)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -44,16 +51,22 @@ func init() {
 	collection = client.Database("book-catalog").Collection("books")
 }
 
+/*
 func SaveBook(book *core.Book) error {
 	//Perform InsertOne operation & validate against the error.
-	_, err := collection.InsertOne(context.TODO(), book)
+	upsert := true
+	_, err := collection.UpdateOne(context.TODO(), book, options.UpdateOptions{
+		Upsert: &upsert,
+	})
 	if err != nil {
+		log.Println("save book")
+		log.Println(err.Error())
 		return err
 	}
 	//Return success without any error.
 	go cache.AddBookToCache(book)
 	return nil
-}
+}*/
 
 func DeleteBook(isbn string) error {
 	filter := bson.D{primitive.E{Key: "isbn", Value: isbn}}
@@ -70,7 +83,7 @@ func DeleteBook(isbn string) error {
 	return nil
 }
 
-func UpdateBook(book core.Book) (*core.Book, error) {
+func UpdateBook(book *core.Book) (*core.Book, error) {
 	//Perform InsertOne operation & validate against the error.
 	filter := bson.D{primitive.E{Key: "isbn", Value: book.Isbn}}
 	upsert := true
@@ -79,11 +92,11 @@ func UpdateBook(book core.Book) (*core.Book, error) {
 		ReturnDocument: &after,
 		Upsert:         &upsert,
 	}
+	var bookDecoded *core.Book
 	result := collection.FindOneAndReplace(context.TODO(), filter, book, &opt)
 	if result.Err() != nil {
 		return nil, result.Err()
 	}
-	var bookDecoded *core.Book
 	fmt.Println(result.Decode(&bookDecoded))
 	go cache.AddBookToCache(bookDecoded)
 	return bookDecoded, nil

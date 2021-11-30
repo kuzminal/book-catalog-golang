@@ -12,14 +12,27 @@ func asyncHandleChannels() {
 		select {
 		case book, ok := <-frontend.CreateBookChannel:
 			if ok {
-				err := storage.SaveBook(&book)
+				//некий retry на случай ошибки, положу его пока сюда просто чтобы был
+				/*err := storage.SaveBook(&book)
+				base, capacity := time.Second, time.Minute
+				for backoff := base; !strings.Contains(err.Error(), "duplicate key"); backoff <<= 1 {
+					if backoff > capacity {
+						backoff = capacity
+					}
+					jitter := rand.Int63n(int64(backoff * 3))
+					sleep := base + time.Duration(jitter)
+					time.Sleep(sleep)
+					err = storage.SaveBook(&book)
+				}*/
+				//конец повнотрных попыток
+				_, err := storage.UpdateBook(&book)
 				if err != nil {
-					log.Fatal(err.Error())
+					log.Println(err.Error())
 				}
 			}
 		case book, ok := <-frontend.UpdateBookChannel:
 			if ok {
-				_, err := storage.UpdateBook(book)
+				_, err := storage.UpdateBook(&book)
 				if err != nil {
 					log.Fatal(err.Error())
 				}
