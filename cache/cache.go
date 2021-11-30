@@ -14,6 +14,7 @@ import (
 var cacheBooks *cache.Cache
 var keyCache = "books"
 var ctx = context.TODO()
+var RedisClient *redis.Client
 
 func init() {
 	//для кластера
@@ -30,14 +31,14 @@ func init() {
 	if redisPort == "" {
 		redisPort = "6379"
 	}
-	redisClient := redis.NewClient(&redis.Options{
+	RedisClient = redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", redisHost, redisPort),
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
 
 	cacheBooks = cache.New(&cache.Options{
-		Redis:      redisClient,
+		Redis:      RedisClient,
 		LocalCache: cache.NewTinyLFU(1000, time.Minute),
 	})
 }

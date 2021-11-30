@@ -1,10 +1,13 @@
 package frontend
 
 import (
+	"book-catalog/cache"
 	"book-catalog/core"
 	"book-catalog/storage"
+	"context"
 	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis_rate/v9"
 	"log"
 	"mime"
 	"net/http"
@@ -55,14 +58,27 @@ func GetHandler(c *gin.Context) {
 }
 
 func GetAllHandler(c *gin.Context) {
-	book, err := storage.GetAll()
+	ctx := context.Background()
+	limiter := redis_rate.NewLimiter(cache.RedisClient)
+	res, err := limiter.Allow(ctx, "getallbooks", redis_rate.PerSecond(50))
 	if err != nil {
-		log.Fatal("Cannot get books from database")
+		panic(err)
 	}
-	if book != nil {
-		renderJSON(c.Writer, book)
+	if res.Remaining == 0 {
+		c.Writer.WriteHeader(http.StatusTooManyRequests)
 	} else {
-		c.Writer.WriteHeader(http.StatusNotFound)
+		book, err := storage.GetAll()
+		if err != nil {
+			log.Println("Cannot get books from database")
+			c.Writer.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if book != nil {
+			renderJSON(c.Writer, book)
+		} else {
+			log.Println("here")
+			c.Writer.WriteHeader(http.StatusNotFound)
+		}
 	}
 }
 
